@@ -278,6 +278,33 @@ static inline bool scan_whitespace(Scanner *scanner, TSLexer *lexer, const bool 
                     return true;
                 }
                 if (crossed_newline) {
+                    // Ruby 4.0: a line starting with `||`, `and` or `or` continues the previous one
+                    // (`&&` is already covered by the `&` case below). All three were syntax errors
+                    // before 4.0, so no older program reads differently.
+                    if (lexer->lookahead == '|') {
+                        advance(lexer);
+                        if (lexer->lookahead == '|') {
+                            return false;
+                        }
+                        lexer->result_symbol = LINE_BREAK;
+                        return true;
+                    }
+                    if (lexer->lookahead == 'a' || lexer->lookahead == 'o') {
+                        const char *word = lexer->lookahead == 'a' ? "and" : "or";
+                        unsigned i = 0;
+                        while (word[i] && lexer->lookahead == word[i]) {
+                            advance(lexer);
+                            i++;
+                        }
+                        if (!word[i] && !is_lower(lexer->lookahead) && !is_upper(lexer->lookahead) &&
+                            !is_digit(lexer->lookahead) && lexer->lookahead != '_' &&
+                            lexer->lookahead != '?' && lexer->lookahead != '!' && lexer->lookahead != ':' &&
+                            lexer->lookahead < 0x80) {
+                            return false;
+                        }
+                        lexer->result_symbol = LINE_BREAK;
+                        return true;
+                    }
                     if (lexer->lookahead != '.' && lexer->lookahead != '&' && lexer->lookahead != '#') {
                         lexer->result_symbol = LINE_BREAK;
                     } else if (lexer->lookahead == '.') {
