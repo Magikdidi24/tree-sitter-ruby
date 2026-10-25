@@ -15,7 +15,14 @@ edition = "2024"
 autoexamples = false
 
 build = "bindings/rust/build.rs"
-include = ["LICENSE", "bindings/rust/*", "grammar.js", "queries/*", "src/*", "tree-sitter.json"]
+include = [
+  "LICENSE",
+  "bindings/rust/*",
+  "grammar.js",
+  "queries/*",
+  "src/*",
+  "tree-sitter.json",
+]
 
 [lib]
 path = "bindings/rust/lib.rs"
@@ -24,7 +31,7 @@ path = "bindings/rust/lib.rs"
 tree-sitter-language = "0.1"
 
 [build-dependencies]
-cc = "1.2"
+cc = "1.10"
 
 [dev-dependencies]
-tree-sitter = "0.24"
+tree-sitter = "0.27.1"
