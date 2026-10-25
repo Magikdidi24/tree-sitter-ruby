@@ -1819,6 +1819,50 @@ y = 1...<<~B
     (heredoc_end)))
 
 ========================================
+heredoc right after return, break and next
+========================================
+
+def f
+  return<<A
+a
+A
+end
+loop { break<<-B }
+  b
+  B
+[1].map { next<<~C }
+  c
+  C
+
+---
+
+(program
+  (method
+    (identifier)
+    (body_statement
+      (return (argument_list (heredoc_beginning)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))))
+  (call
+    (identifier)
+    (block
+      (block_body
+        (break (argument_list (heredoc_beginning))))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (call
+    (array (integer))
+    (identifier)
+    (block
+      (block_body
+        (next (argument_list (heredoc_beginning))))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+========================================
 left shift without spaces is not a heredoc
 ========================================
 
