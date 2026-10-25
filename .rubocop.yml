@@ -1,0 +1,7 @@
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 4.0
+  Exclude:
+    - examples/**/*
+    - test/**/* # grammar fixtures, odd Ruby on purpose
+    - node_modules/**/*

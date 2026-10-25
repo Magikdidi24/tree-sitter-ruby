@@ -11,10 +11,10 @@
 #   LIST holds path suffixes (one per line, `#` comments) of files expected to differ.
 #   Exits 1 on a difference outside LIST, or when a listed file agrees again (so the list only shrinks).
 
-require "prism"
-require "tempfile"
+require 'prism'
+require 'tempfile'
 
-ROOT = File.expand_path("..", __dir__)
+ROOT = File.expand_path('..', __dir__)
 
 # Prism node type => [comparison group, location method (default: location)]
 PRISM = {
@@ -32,7 +32,7 @@ PRISM = {
   case_node: [:case],
   case_match_node: [:case],
   rescue_node: [:rescue],
-  ensure_node: [:ensure, :ensure_keyword_loc],
+  ensure_node: %i[ensure ensure_keyword_loc],
   rescue_modifier_node: [:rescue_modifier],
   alias_method_node: [:alias],
   alias_global_variable_node: [:alias],
@@ -45,24 +45,24 @@ PRISM = {
   match_predicate_node: [:test_pattern],
   match_required_node: [:match_pattern],
   regular_expression_node: [:regex],
-  interpolated_regular_expression_node: [:regex],
+  interpolated_regular_expression_node: [:regex]
 }.freeze
 
 # tree-sitter node type => comparison group
 TREE_SITTER = {
-  "method" => :def, "singleton_method" => :def,
-  "class" => :class, "module" => :module, "singleton_class" => :singleton_class,
-  "lambda" => :lambda, "block" => :block, "do_block" => :block,
-  "if" => :if, "if_modifier" => :if, "elsif" => :if, "conditional" => :if,
-  "unless" => :unless, "unless_modifier" => :unless,
-  "while" => :while, "while_modifier" => :while, "until" => :until, "until_modifier" => :until,
-  "for" => :for, "case" => :case, "case_match" => :case,
-  "rescue" => :rescue, "ensure" => :ensure, "rescue_modifier" => :rescue_modifier,
-  "alias" => :alias, "range" => :range,
-  "return" => :return, "yield" => :yield, "break" => :break, "next" => :next,
-  "test_pattern" => :test_pattern, "match_pattern" => :match_pattern,
-  "regex" => :regex, "heredoc_beginning" => :heredoc, "begin" => :begin,
-  "if_guard" => :if, "unless_guard" => :unless,
+  'method' => :def, 'singleton_method' => :def,
+  'class' => :class, 'module' => :module, 'singleton_class' => :singleton_class,
+  'lambda' => :lambda, 'block' => :block, 'do_block' => :block,
+  'if' => :if, 'if_modifier' => :if, 'elsif' => :if, 'conditional' => :if,
+  'unless' => :unless, 'unless_modifier' => :unless,
+  'while' => :while, 'while_modifier' => :while, 'until' => :until, 'until_modifier' => :until,
+  'for' => :for, 'case' => :case, 'case_match' => :case,
+  'rescue' => :rescue, 'ensure' => :ensure, 'rescue_modifier' => :rescue_modifier,
+  'alias' => :alias, 'range' => :range,
+  'return' => :return, 'yield' => :yield, 'break' => :break, 'next' => :next,
+  'test_pattern' => :test_pattern, 'match_pattern' => :match_pattern,
+  'regex' => :regex, 'heredoc_beginning' => :heredoc, 'begin' => :begin,
+  'if_guard' => :if, 'unless_guard' => :unless
 }.freeze
 
 HEREDOC_NODES = %i[string_node interpolated_string_node x_string_node interpolated_x_string_node].freeze
@@ -72,30 +72,53 @@ def prism_positions(result)
   stack = [[result.value, nil]]
   until stack.empty?
     node, parent = stack.pop
-    stack.concat(node.compact_child_nodes.map { [_1, node] })
-    group, loc_method = PRISM[node.type]
-    loc = loc_method ? node.public_send(loc_method) : node.location
-    if parent&.type == :in_node && %i[if_node unless_node].include?(node.type)
-      # `in pat if cond`: tree-sitter's guard starts at the keyword, Prism's IfNode at the pattern
-      loc = node.type == :if_node ? node.if_keyword_loc : node.keyword_loc
-    elsif node.type == :begin_node
-      group, loc = :begin, node.begin_keyword_loc # implicit `def ... rescue` bodies have none
-    elsif HEREDOC_NODES.include?(node.type) && node.opening_loc&.slice&.start_with?("<<")
-      group, loc = :heredoc, node.opening_loc
-    end
+    stack.concat(node.compact_child_nodes.map { [it, node] })
+    group, loc = prism_location(node, parent)
     found[[group, loc.start_line - 1, loc.start_column]] += 1 if group && loc
   end
   found
 end
 
+def prism_location(node, parent)
+  group, loc_method = PRISM[node.type]
+  if (guard = guard_location(node, parent))
+    [group, guard]
+  elsif node.type == :begin_node
+    [:begin, node.begin_keyword_loc] # implicit `def ... rescue` bodies have none
+  elsif heredoc?(node)
+    [:heredoc, node.opening_loc]
+  else
+    [group, loc_method ? node.public_send(loc_method) : node.location]
+  end
+end
+
+# `in pat if cond`: tree-sitter's guard starts at the keyword, Prism's IfNode at the pattern
+def guard_location(node, parent)
+  return unless parent&.type == :in_node
+
+  case node.type
+  when :if_node then node.if_keyword_loc
+  when :unless_node then node.keyword_loc
+  end
+end
+
+def heredoc?(node)
+  HEREDOC_NODES.include?(node.type) && node.opening_loc&.slice&.start_with?('<<')
+end
+
+def tree_sitter_output(files)
+  Tempfile.create('prism-diff') do |list|
+    list.write(files.join("\n") << "\n")
+    list.flush
+    IO.popen([ENV.fetch('TREE_SITTER', 'tree-sitter'), 'parse', '-p', ROOT, '--paths', list.path],
+             err: File::NULL, &:read)
+  end
+end
+
 def tree_sitter_trees(files)
-  list = Tempfile.new("prism-diff")
-  list.write(files.join("\n") << "\n")
-  list.close
-  out = IO.popen([ENV.fetch("TREE_SITTER", "tree-sitter"), "parse", "-p", ROOT, "--paths", list.path], err: File::NULL, &:read)
   # each tree starts with its root at column 0: (program ...) or, when nothing parses, (ERROR ...)
-  trees = out.each_line.slice_before { |line| line.start_with?("(") }.map(&:join)
-  trees = trees.drop_while { |tree| !tree.start_with?("(") }
+  trees = tree_sitter_output(files).each_line.slice_before { |line| line.start_with?('(') }.map(&:join)
+  trees = trees.drop_while { |tree| !tree.start_with?('(') }
   abort "tree-sitter printed #{trees.size} trees for #{files.size} files" unless trees.size == files.size
   trees
 end
@@ -103,7 +126,7 @@ end
 def tree_sitter_positions(tree)
   found = Hash.new(0)
   tree.scan(/(\w+: )?\((\w+) \[(\d+), (\d+)\]/) do |field, kind, row, column|
-    next if field == "body: " && %w[block do_block].include?(kind) # a lambda body, part of Prism's LambdaNode
+    next if field == 'body: ' && %w[block do_block].include?(kind) # a lambda body, part of Prism's LambdaNode
 
     group = TREE_SITTER[kind]
     found[[group, row.to_i, column.to_i]] += 1 if group
@@ -111,15 +134,15 @@ def tree_sitter_positions(tree)
   found
 end
 
-verbose = ARGV.delete("--verbose")
+verbose = ARGV.delete('--verbose')
 known = []
-if (i = ARGV.index("--known"))
-  known = File.readlines(ARGV.delete_at(i + 1), chomp: true).map { _1.sub(/#.*/, "").strip }.reject(&:empty?)
+if (i = ARGV.index('--known'))
+  known = File.readlines(ARGV.delete_at(i + 1), chomp: true).map { it.sub(/#.*/, '').strip }.reject(&:empty?)
   ARGV.delete_at(i)
 end
-known_file = ->(file) { known.any? { file.end_with?("/#{_1}") } }
-files = ARGV.flat_map { |path| File.directory?(path) ? Dir.glob("#{path}/**/*.rb").sort : [path] }
-abort "usage: ruby script/prism_diff.rb [--verbose] [--known LIST] FILE_OR_DIR..." if files.empty?
+known_file = ->(file) { known.any? { file.end_with?("/#{it}") } }
+files = ARGV.flat_map { |path| File.directory?(path) ? Dir.glob("#{path}/**/*.rb") : [path] }
+abort 'usage: ruby script/prism_diff.rb [--verbose] [--known LIST] FILE_OR_DIR...' if files.empty?
 
 counts = Hash.new(0)
 failures = 0
@@ -129,9 +152,10 @@ files.zip(tree_sitter_trees(files)).each do |file, tree|
   next counts[:prism_errors] += 1 unless result.errors.empty? # invalid Ruby: nothing to compare against
 
   problems = []
-  error = tree[/\((ERROR|MISSING)[^\[]*\[(\d+), (\d+)\]/]
-  problems << "tree-sitter #{$1} at #{$2.to_i + 1}:#{$3}" if error
-  expected, actual = prism_positions(result), tree_sitter_positions(tree)
+  error = tree.match(/\((ERROR|MISSING)[^\[]*\[(\d+), (\d+)\]/)
+  problems << "tree-sitter #{error[1]} at #{error[2].to_i + 1}:#{error[3]}" if error
+  expected = prism_positions(result)
+  actual = tree_sitter_positions(tree)
   kinds = Hash.new(0)
   (expected.keys | actual.keys).each do |key|
     diff = expected[key] - actual[key]

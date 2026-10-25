@@ -18,6 +18,9 @@ on:
       - setup.py
       - go.mod
       - Package.swift
+      - Gemfile
+      - Gemfile.lock
+      - .rubocop.yml
   pull_request:
     paths:
       - grammar.js
@@ -34,6 +37,9 @@ on:
       - setup.py
       - go.mod
       - Package.swift
+      - Gemfile
+      - Gemfile.lock
+      - .rubocop.yml
 
 concurrency:
   group: ${{github.workflow}}-${{github.ref}}
@@ -94,10 +100,13 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
+          bundler-cache: true
+      - name: Run RuboCop
+        run: bundle exec rubocop
       - name: Set up ruby/spec
         # pinned: a new spec file must not break unrelated changes; bump it on purpose
         run: |
           git clone https://github.com/ruby/spec examples/ruby_spec --filter=blob:none --quiet
           git -C examples/ruby_spec checkout --quiet 0816047460cc5c4ca23d09794b48e8638a7047cc
       - name: Compare with Prism
-        run: ruby script/prism_diff.rb --known script/prism_diff_known.txt examples/ruby_spec
+        run: bundle exec ruby script/prism_diff.rb --known script/prism_diff_known.txt examples/ruby_spec
