@@ -1863,6 +1863,35 @@ loop { break<<-B }
     (heredoc_end)))
 
 ========================================
+heredoc end word followed by blanks is content
+========================================
+
+x = <<A
+a
+A 
+A
+y = <<~B
+  b
+  B	
+  B
+
+---
+
+(program
+  (assignment
+    (identifier)
+    (heredoc_beginning))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (assignment
+    (identifier)
+    (heredoc_beginning))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+========================================
 left shift without spaces is not a heredoc
 ========================================
 

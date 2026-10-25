@@ -87,4 +87,14 @@ mod tests {
             assert_eq!(comment.end_byte(), ranges[0].end_byte, "{}", root.to_sexp());
         }
     }
+
+    #[test]
+    fn test_heredoc_end_word_at_eof() {
+        // Same tree shape whether `EOS` ends the heredoc or is content, only the range differs
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&super::LANGUAGE.into()).unwrap();
+        let tree = parser.parse("x = <<EOS\na\nEOS", None).unwrap();
+        let end = tree.root_node().named_child(1).unwrap().named_child(1).unwrap();
+        assert_eq!((end.kind(), end.start_byte()), ("heredoc_end", 12), "{}", tree.root_node().to_sexp());
+    }
 }

@@ -725,10 +725,7 @@ static inline bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, const 
             if (!has_content) {
                 lexer->mark_end(lexer);
             }
-            while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
-                advance(lexer);
-            }
-            if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+            if (lexer->lookahead == '\n' || lexer->lookahead == '\r' || lexer->eof(lexer)) {
                 if (has_content) {
                     heredoc->mid_line = false;
                     lexer->result_symbol = HEREDOC_CONTENT;
