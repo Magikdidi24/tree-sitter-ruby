@@ -48,7 +48,6 @@ PRISM = {
   interpolated_regular_expression_node: [:regex]
 }.freeze
 
-# tree-sitter node type => comparison group
 TREE_SITTER = {
   'method' => :def, 'singleton_method' => :def,
   'class' => :class, 'module' => :module, 'singleton_class' => :singleton_class,
@@ -149,7 +148,7 @@ failures = 0
 fixed = []
 files.zip(tree_sitter_trees(files)).each do |file, tree|
   result = Prism.parse_file(file)
-  next counts[:prism_errors] += 1 unless result.errors.empty? # invalid Ruby: nothing to compare against
+  next counts[:prism_errors] += 1 unless result.errors.empty?
 
   problems = []
   error = tree.match(/\((ERROR|MISSING)[^\[]*\[(\d+), (\d+)\]/)

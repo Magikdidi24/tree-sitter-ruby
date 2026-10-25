@@ -170,7 +170,6 @@ module.exports = grammar({
       field('name', $._method_name),
       choice(
         $._body_expr,
-        // with parameters
         seq(
           field('parameters', alias($.parameters, $.method_parameters)),
           choice(
@@ -179,7 +178,6 @@ module.exports = grammar({
           ),
 
         ),
-        // without parameters but with body
         seq(
           optional(
             field('parameters', alias($.bare_parameters, $.method_parameters)),
@@ -890,9 +888,8 @@ module.exports = grammar({
       '}',
     )),
 
-    // Where both a block and a hash argument can start (`foo {`, `x.y {`), the `{` would
-    // otherwise be shared until a later conflict picks the hash. Reducing the brace on its
-    // own forces the choice right after it, and the precedence makes it a block, as in Ruby.
+    // `foo {`, `x.y {`: reducing the brace on its own forces the block-or-hash choice right away,
+    // and the precedence picks the block, as Ruby does
     _block_open: _ => prec(PREC.CURLY_BLOCK, '{'),
 
     _arg_rhs: $ => choice($._arg, alias($.rescue_modifier_arg, $.rescue_modifier)),
@@ -1276,7 +1273,6 @@ module.exports = grammar({
 
     lambda: $ => seq(
       '->',
-      // Optional parameters: either parenthesized, bare, or absent
       optional(
         field(
           'parameters',
@@ -1289,7 +1285,6 @@ module.exports = grammar({
           ),
         ),
       ),
-      // Body can be a regular or "do" block
       field('body', choice(alias($._lambda_block, $.block), $.do_block)),
     ),
 
@@ -1303,7 +1298,6 @@ module.exports = grammar({
     ),
 
 
-    // Lambda parameters with optional shadow variables: (a, b; x, y)
     lambda_parameters_with_parens: $ => seq(
       '(',
       commaSep($._formal_parameter),

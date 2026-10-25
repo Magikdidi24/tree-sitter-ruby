@@ -279,8 +279,7 @@ static inline bool scan_whitespace(Scanner *scanner, TSLexer *lexer, const bool 
                 }
                 if (crossed_newline) {
                     // Ruby 4.0: a line starting with `||`, `and` or `or` continues the previous one
-                    // (`&&` is already covered by the `&` case below). All three were syntax errors
-                    // before 4.0, so no older program reads differently.
+                    // (`&&` is covered by the `&` case below)
                     if (lexer->lookahead == '|') {
                         advance(lexer);
                         if (lexer->lookahead == '|') {
@@ -486,9 +485,8 @@ static const PercentLiteral PERCENT_LITERALS[] = {
 };
 
 static inline bool scan_open_delimiter(Scanner *scanner, TSLexer *lexer, Literal *literal, const bool *valid_symbols) {
-    // After `..` and `...` (NO_LINE_BREAK, see `range`) binary operators are valid only because the range may be
-    // endless, after `return`, `break` and `next` (OPERAND_NEXT) because they may be bare: Ruby reads an operand
-    // there. STRING_CONTENT is valid along with STRING_START only in error recovery.
+    // After `..`/`...` (NO_LINE_BREAK) and `return`/`break`/`next` (OPERAND_NEXT), Ruby reads an operand even
+    // though binary operators are valid there. STRING_CONTENT valid along with STRING_START means error recovery.
     const bool binary_operator_valid =
         valid_symbols[FORWARD_SLASH] &&
         (!(valid_symbols[NO_LINE_BREAK] || valid_symbols[OPERAND_NEXT]) || valid_symbols[STRING_CONTENT]);
@@ -791,7 +789,6 @@ static inline bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, const 
                 if (scan_short_interpolation(lexer, has_content, HEREDOC_CONTENT)) {
                     return true;
                 }
-                // A plain `#` is content
                 has_content = true;
                 lexer->mark_end(lexer);
             } else if (lexer->lookahead == '\r' || lexer->lookahead == '\n') {
@@ -1070,8 +1067,7 @@ static inline bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symb
             break;
 
         case '{':
-            // Valid only where a lambda body can start, which is the meaning `{` has there in Ruby. Not during
-            // error recovery (every symbol valid, STRING_CONTENT included)
+            // Only where a lambda body can start, not in error recovery (every symbol valid, STRING_CONTENT included)
             if (valid_symbols[LAMBDA_BRACE] && !valid_symbols[STRING_CONTENT]) {
                 advance(lexer);
                 lexer->result_symbol = LAMBDA_BRACE;
@@ -1114,7 +1110,6 @@ static inline bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symb
 
         if (rescue_may_end_line && length == sizeof(RESCUE) - 1 && !is_iden_char(lexer->lookahead) &&
             lexer->lookahead != '?' && lexer->lookahead != '!' && lexer->lookahead != ':') {
-            // Zero-width line break before `rescue`
             lexer->result_symbol = LINE_BREAK;
             return true;
         }
