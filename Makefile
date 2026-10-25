@@ -1,6 +1,6 @@
 LANGUAGE_NAME := tree-sitter-ruby
 HOMEPAGE_URL := https://github.com/tree-sitter/tree-sitter-ruby
-VERSION := 0.23.1
+VERSION := 0.24.0
 DESCRIPTION := Ruby grammar for tree-sitter
 
 # repository
